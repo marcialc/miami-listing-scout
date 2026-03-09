@@ -7,11 +7,11 @@ crons = ["0 12 * * *"]  # Daily at 7am EST (12:00 UTC)
 
 [[kv_namespaces]]
 binding = "SCOUT_CONFIG"
-id = "<KV_NAMESPACE_ID>"
+id = "265b26f823ff409880db18ce68062b67"
 
 [[kv_namespaces]]
 binding = "SEEN_LISTINGS"
-id = "<KV_NAMESPACE_ID>"
+id = "def844544b384b9fa489ecfcd42e4cdf"
 
 [vars]
 EMAIL_FROM = "scout@yourdomain.com"
