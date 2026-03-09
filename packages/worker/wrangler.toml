@@ -1,0 +1,25 @@
+name = "miami-listing-scout-worker"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+
+[triggers]
+crons = ["0 12 * * *"]  # Daily at 7am EST (12:00 UTC)
+
+[[kv_namespaces]]
+binding = "SCOUT_CONFIG"
+id = "<KV_NAMESPACE_ID>"
+
+[[kv_namespaces]]
+binding = "SEEN_LISTINGS"
+id = "<KV_NAMESPACE_ID>"
+
+[vars]
+EMAIL_FROM = "scout@yourdomain.com"
+MOCK_MODE = "false"
+
+# Set these via `wrangler secret put` for production
+# or in .dev.vars for local development:
+# BRIDGE_API_TOKEN=
+# ANTHROPIC_API_KEY=
+# RESEND_API_KEY=
+# CONFIG_API_KEY=

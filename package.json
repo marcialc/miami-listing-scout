@@ -1,0 +1,17 @@
+{
+  "name": "miami-listing-scout",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "deploy:worker": "pnpm --filter @miami-listing-scout/worker exec wrangler deploy",
+    "deploy:web": "pnpm --filter @miami-listing-scout/web exec wrangler pages deploy dist --project-name=miami-listing-scout"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3"
+  },
+  "packageManager": "pnpm@9.12.1"
+}
