@@ -11,6 +11,8 @@ export const ANALYSIS_MODULES = [
 
 export type AnalysisModule = (typeof ANALYSIS_MODULES)[number];
 
+export type ScanFrequency = "daily" | "twice_daily" | "weekdays_only";
+
 // ── Listing Filters ──────────────────────────────────────────────
 
 export interface ListingFilters {
@@ -39,7 +41,9 @@ export interface ScoutConfig {
   schedule: {
     timezone: string;
     hour: number;
+    frequency: ScanFrequency;
   };
+  maxListingsPerReport: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -134,6 +138,135 @@ export interface DailyReport {
   generatedAt: string;
 }
 
+// ── Report Summary (for index/listing) ──────────────────────────
+
+export interface ReportSummary {
+  key: string;
+  date: string;
+  generatedAt: string;
+  totalNewListings: number;
+  totalMatches: number;
+  totalAnalyzed: number;
+  listingsCount: number;
+}
+
+// ── MLS Cities ──────────────────────────────────────────────────
+
+export const MLS_CITIES: readonly string[] = [
+  // Miami-Dade County
+  "Aventura",
+  "Bal Harbour",
+  "Bay Harbor Islands",
+  "Biscayne Park",
+  "Brickell",
+  "Coconut Grove",
+  "Coral Gables",
+  "Cutler Bay",
+  "Doral",
+  "Edgewater",
+  "El Portal",
+  "Florida City",
+  "Golden Beach",
+  "Hialeah",
+  "Hialeah Gardens",
+  "Homestead",
+  "Indian Creek",
+  "Islandia",
+  "Key Biscayne",
+  "Medley",
+  "Miami",
+  "Miami Beach",
+  "Miami Gardens",
+  "Miami Lakes",
+  "Miami Shores",
+  "Miami Springs",
+  "Midtown",
+  "North Bay Village",
+  "North Miami",
+  "North Miami Beach",
+  "Opa-locka",
+  "Palmetto Bay",
+  "Pinecrest",
+  "South Miami",
+  "Sunny Isles Beach",
+  "Surfside",
+  "Sweetwater",
+  "Virginia Gardens",
+  "West Miami",
+  "Wynwood",
+  // Broward County
+  "Coconut Creek",
+  "Cooper City",
+  "Coral Springs",
+  "Dania Beach",
+  "Davie",
+  "Deerfield Beach",
+  "Fort Lauderdale",
+  "Hallandale Beach",
+  "Hillsboro Beach",
+  "Hollywood",
+  "Lauderdale Lakes",
+  "Lauderdale-by-the-Sea",
+  "Lauderhill",
+  "Lazy Lake",
+  "Lighthouse Point",
+  "Margate",
+  "Miramar",
+  "North Lauderdale",
+  "Oakland Park",
+  "Parkland",
+  "Pembroke Park",
+  "Pembroke Pines",
+  "Plantation",
+  "Pompano Beach",
+  "Sea Ranch Lakes",
+  "Southwest Ranches",
+  "Sunrise",
+  "Tamarac",
+  "Weston",
+  "Wilton Manors",
+  // Palm Beach County
+  "Atlantis",
+  "Belle Glade",
+  "Boca Raton",
+  "Boynton Beach",
+  "Briny Breezes",
+  "Cloud Lake",
+  "Delray Beach",
+  "Glen Ridge",
+  "Golf",
+  "Greenacres",
+  "Gulf Stream",
+  "Haverhill",
+  "Highland Beach",
+  "Hypoluxo",
+  "Juno Beach",
+  "Jupiter",
+  "Jupiter Inlet Colony",
+  "Lake Clarke Shores",
+  "Lake Park",
+  "Lake Worth Beach",
+  "Lantana",
+  "Loxahatchee Groves",
+  "Manalapan",
+  "Mangonia Park",
+  "North Palm Beach",
+  "Ocean Ridge",
+  "Pahokee",
+  "Palm Beach",
+  "Palm Beach Gardens",
+  "Palm Beach Shores",
+  "Palm Springs",
+  "Riviera Beach",
+  "Royal Palm Beach",
+  "South Bay",
+  "South Palm Beach",
+  "Tequesta",
+  "Wellington",
+  "West Palm Beach",
+  "Westlake",
+] as const;
+
 // ── Default Config ───────────────────────────────────────────────
 
 export const DEFAULT_CONFIG: Omit<ScoutConfig, "id" | "email" | "name" | "createdAt" | "updatedAt"> = {
@@ -157,5 +290,7 @@ export const DEFAULT_CONFIG: Omit<ScoutConfig, "id" | "email" | "name" | "create
   schedule: {
     timezone: "America/New_York",
     hour: 7,
+    frequency: "daily",
   },
+  maxListingsPerReport: 25,
 };

@@ -1,5 +1,6 @@
 import type { ScoutConfig } from "@miami-listing-scout/shared";
 import { TagInput } from "./TagInput";
+import { CityAutocomplete } from "./CityAutocomplete";
 import { SectionCard } from "./SectionCard";
 
 interface Props {
@@ -107,10 +108,10 @@ export function FiltersSection({ config, updateConfig }: Props) {
       <div className="flex flex-col gap-5">
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1.5">Cities</label>
-          <TagInput
-            tags={f.cities}
+          <CityAutocomplete
+            selected={f.cities}
             onChange={(v) => updateFilter("cities", v)}
-            placeholder="Type a city and press Enter..."
+            placeholder="Search for a city..."
           />
         </div>
 

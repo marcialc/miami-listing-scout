@@ -1,4 +1,4 @@
-import type { ScoutConfig } from "@miami-listing-scout/shared";
+import type { ScoutConfig, DailyReport, ReportSummary } from "@miami-listing-scout/shared";
 import { DEFAULT_CONFIG } from "@miami-listing-scout/shared";
 
 const API_URL = import.meta.env.VITE_WORKER_API_URL ?? "";
@@ -80,7 +80,7 @@ export async function saveConfig(config: ScoutConfig): Promise<void> {
   }
 }
 
-export async function triggerTestRun(): Promise<void> {
+export async function triggerTestRun(): Promise<string> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}/api/test-run`, {
@@ -90,8 +90,29 @@ export async function triggerTestRun(): Promise<void> {
   } catch (err) {
     throw new Error(friendlyError(err));
   }
+  const body = await res.json().catch(() => ({})) as Record<string, string>;
+  if (!res.ok) {
+    throw new Error(body.error ?? body.message ?? `Test run failed (HTTP ${res.status})`);
+  }
+  return body.message ?? "Scan complete";
+}
+
+export async function fetchReports(): Promise<ReportSummary[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/reports`, { headers: headers() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn("Failed to fetch reports:", err);
+    return [];
+  }
+}
+
+export async function fetchReport(key: string): Promise<DailyReport> {
+  const res = await fetch(`${API_URL}/api/reports?key=${encodeURIComponent(key)}`, { headers: headers() });
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as Record<string, string>;
-    throw new Error(body.error ?? `Test run failed (HTTP ${res.status})`);
+    throw new Error(body.error ?? `Failed to load report (HTTP ${res.status})`);
   }
+  return await res.json();
 }

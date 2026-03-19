@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2025-03-01"
 
 [triggers]
-crons = ["0 12 * * *"]  # Daily at 7am EST (12:00 UTC)
+crons = ["0 */12 * * *"]  # Every 12h (00:00 and 12:00 UTC) — handler skips based on frequency config
 
 [[kv_namespaces]]
 binding = "SCOUT_CONFIG"
@@ -15,7 +15,7 @@ id = "def844544b384b9fa489ecfcd42e4cdf"
 
 [vars]
 EMAIL_FROM = "scout@yourdomain.com"
-MOCK_MODE = "false"
+MOCK_MODE = "true"
 
 # Set these via `wrangler secret put` for production
 # or in .dev.vars for local development:

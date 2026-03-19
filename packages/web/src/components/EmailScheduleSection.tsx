@@ -1,4 +1,4 @@
-import type { ScoutConfig } from "@miami-listing-scout/shared";
+import type { ScoutConfig, ScanFrequency } from "@miami-listing-scout/shared";
 import { SectionCard } from "./SectionCard";
 
 interface Props {
@@ -49,6 +49,44 @@ export function EmailScheduleSection({ config, updateConfig }: Props) {
             className="w-full text-sm border border-stone-300 rounded-lg py-2.5 px-3 bg-white text-stone-800 placeholder:text-stone-400 focus:border-accent-500 focus:ring-1 focus:ring-accent-500 outline-none transition-colors"
           />
           <p className="mt-1 text-xs text-stone-400">Daily reports will be sent to this address</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1.5">Scan Frequency</label>
+            <select
+              value={config.schedule.frequency}
+              onChange={(e) =>
+                updateConfig((prev) => ({
+                  ...prev,
+                  schedule: { ...prev.schedule, frequency: e.target.value as ScanFrequency },
+                }))
+              }
+              className="w-full text-sm border border-stone-300 rounded-lg py-2.5 px-3 bg-white text-stone-800 focus:border-accent-500 focus:ring-1 focus:ring-accent-500 outline-none transition-colors cursor-pointer"
+            >
+              <option value="daily">Daily</option>
+              <option value="twice_daily">Twice Daily</option>
+              <option value="weekdays_only">Weekdays Only</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1.5">Max Listings per Report</label>
+            <select
+              value={config.maxListingsPerReport}
+              onChange={(e) =>
+                updateConfig((prev) => ({
+                  ...prev,
+                  maxListingsPerReport: Number(e.target.value),
+                }))
+              }
+              className="w-full text-sm border border-stone-300 rounded-lg py-2.5 px-3 bg-white text-stone-800 focus:border-accent-500 focus:ring-1 focus:ring-accent-500 outline-none transition-colors cursor-pointer"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-5">

@@ -5,6 +5,7 @@ interface HeaderProps {
   runningTest: boolean;
   onRunNow: () => void;
   schedule: { timezone: string; hour: number };
+  currentPage: string;
 }
 
 function formatLastRun(iso: string): string {
@@ -31,7 +32,12 @@ function formatNextRun(schedule: { timezone: string; hour: number }): string {
   return `${h12}:00 ${ampm} daily`;
 }
 
-export function Header({ health, runningTest, onRunNow, schedule }: HeaderProps) {
+const TABS = [
+  { id: "settings", label: "Settings", hash: "#/" },
+  { id: "reports", label: "Reports", hash: "#/reports" },
+];
+
+export function Header({ health, runningTest, onRunNow, schedule, currentPage }: HeaderProps) {
   return (
     <header className="bg-white border-b border-stone-200">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -83,6 +89,25 @@ export function Header({ health, runningTest, onRunNow, schedule }: HeaderProps)
           </button>
         </div>
       </div>
+
+      <nav className="max-w-3xl mx-auto px-4 sm:px-6 flex gap-6">
+        {TABS.map((tab) => {
+          const active = tab.id === currentPage;
+          return (
+            <a
+              key={tab.id}
+              href={tab.hash}
+              className={`text-sm pb-2.5 -mb-px border-b-2 transition-colors ${
+                active
+                  ? "border-accent-600 text-accent-700 font-medium"
+                  : "border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300"
+              }`}
+            >
+              {tab.label}
+            </a>
+          );
+        })}
+      </nav>
     </header>
   );
 }

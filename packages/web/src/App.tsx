@@ -9,6 +9,30 @@ import { AnalysisSection } from "./components/AnalysisSection";
 import { EmailScheduleSection } from "./components/EmailScheduleSection";
 import { SaveBar } from "./components/SaveBar";
 import { Toast } from "./components/Toast";
+import { ReportsPage } from "./components/ReportsPage";
+import { ReportDetail } from "./components/ReportDetail";
+import { ListingDetailPage } from "./components/ListingDetailPage";
+
+type Page =
+  | { name: "settings" }
+  | { name: "reports" }
+  | { name: "report-detail"; key: string }
+  | { name: "listing-detail"; key: string; listingId: string };
+
+function parseHash(): Page {
+  const hash = window.location.hash;
+  if (hash.startsWith("#/reports?")) {
+    const params = new URLSearchParams(hash.slice("#/reports?".length));
+    const key = params.get("key");
+    const listing = params.get("listing");
+    if (key && listing) return { name: "listing-detail", key, listingId: listing };
+    if (key) return { name: "report-detail", key };
+  }
+  if (hash === "#/reports") {
+    return { name: "reports" };
+  }
+  return { name: "settings" };
+}
 
 function getDefaultConfig(): ScoutConfig {
   const now = new Date().toISOString();
@@ -23,6 +47,7 @@ function getDefaultConfig(): ScoutConfig {
 }
 
 export default function App() {
+  const [page, setPage] = useState<Page>(parseHash);
   const [config, setConfig] = useState<ScoutConfig>(getDefaultConfig);
   const [savedConfig, setSavedConfig] = useState<ScoutConfig>(getDefaultConfig);
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -32,6 +57,12 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const hasChanges = JSON.stringify(config) !== JSON.stringify(savedConfig);
+
+  useEffect(() => {
+    const onHashChange = () => setPage(parseHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -66,8 +97,8 @@ export default function App() {
   const handleRunNow = useCallback(async () => {
     setRunningTest(true);
     try {
-      await triggerTestRun();
-      showToast("Scan started — check your email shortly", "success");
+      const result = await triggerTestRun();
+      showToast(result, "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to trigger scan", "error");
     } finally {
@@ -94,6 +125,8 @@ export default function App() {
         runningTest={runningTest}
         onRunNow={handleRunNow}
         schedule={config.schedule}
+        currentPage={page.name === "settings" ? "settings" : "reports"}
+
       />
 
       {health?.mockMode && (
@@ -111,17 +144,26 @@ export default function App() {
         </div>
       )}
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-8">
-        <FiltersSection config={config} updateConfig={updateConfig} />
-        <AnalysisSection config={config} updateConfig={updateConfig} />
-        <EmailScheduleSection config={config} updateConfig={updateConfig} />
+      <main className={`${page.name === "listing-detail" ? "max-w-5xl" : "max-w-3xl"} mx-auto px-4 sm:px-6 py-8 flex flex-col gap-8`}>
+        {page.name === "settings" && (
+          <>
+            <FiltersSection config={config} updateConfig={updateConfig} />
+            <AnalysisSection config={config} updateConfig={updateConfig} />
+            <EmailScheduleSection config={config} updateConfig={updateConfig} />
+          </>
+        )}
+        {page.name === "reports" && <ReportsPage />}
+        {page.name === "report-detail" && <ReportDetail reportKey={page.key} />}
+        {page.name === "listing-detail" && <ListingDetailPage reportKey={page.key} listingId={page.listingId} />}
       </main>
 
-      <SaveBar
-        hasChanges={hasChanges}
-        saving={saving}
-        onSave={handleSave}
-      />
+      {page.name === "settings" && (
+        <SaveBar
+          hasChanges={hasChanges}
+          saving={saving}
+          onSave={handleSave}
+        />
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} />}
     </div>

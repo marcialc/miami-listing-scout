@@ -114,7 +114,7 @@ export async function analyzeListing(
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
     }),
@@ -131,7 +131,9 @@ export async function analyzeListing(
     throw new Error("No text content in Anthropic response");
   }
 
-  const parsed = JSON.parse(textBlock.text) as {
+  const cleanedText = textBlock.text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
+  const parsed = JSON.parse(cleanedText) as {
     overallScore: number;
     summary: string;
     moduleResults: Record<string, ModuleResult>;
