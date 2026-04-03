@@ -3,6 +3,7 @@ import type {
   DailyReport,
   ListingAnalysis,
   Recommendation,
+  RprData,
   ScoutConfig,
 } from "@miami-listing-scout/shared";
 
@@ -12,6 +13,8 @@ export function buildReport(
   config: ScoutConfig,
   totalFetched: number,
   failedAnalysisCount = 0,
+  dateOverride?: string,
+  rprDataMap?: Map<string, RprData>,
 ): DailyReport {
   const analysisMap = new Map(analyses.map((a) => [a.listingId, a]));
 
@@ -20,11 +23,12 @@ export function buildReport(
     .map((listing) => ({
       listing,
       analysis: analysisMap.get(listing.listingId)!,
+      rprData: rprDataMap?.get(listing.listingId),
     }))
     .sort((a, b) => b.analysis.overallScore - a.analysis.overallScore);
 
   return {
-    date: new Date().toISOString().split("T")[0],
+    date: dateOverride ?? new Date().toISOString().split("T")[0],
     totalNewListings: totalFetched,
     totalMatches: listings.length,
     totalAnalyzed: analyses.length,
@@ -68,7 +72,44 @@ function formatPrice(price: number): string {
   return "$" + price.toLocaleString("en-US");
 }
 
-function renderListingCard(listing: BridgeListing, analysis: ListingAnalysis): string {
+function renderRprBox(rprData: RprData): string {
+  const ratio = rprData.valuation.priceToValueRatio;
+  const ratioColor = ratio <= 0.95 ? "#16a34a" : ratio >= 1.05 ? "#dc2626" : "#ca8a04";
+  const ratioLabel = ratio <= 0.95 ? "Underpriced" : ratio >= 1.05 ? "Overpriced" : "Fair Value";
+  const avgSchoolRating = rprData.schools.length > 0
+    ? (rprData.schools.reduce((sum, s) => sum + s.rating, 0) / rprData.schools.length).toFixed(1)
+    : "N/A";
+
+  return `
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:12px;margin-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">RPR Valuation</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px;color:#6b7280;">RVM Estimate</div>
+          <div style="font-size:14px;font-weight:600;color:#111827;">$${rprData.valuation.estimatedValue.toLocaleString("en-US")}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#6b7280;">Price/Value</div>
+          <div style="font-size:14px;font-weight:600;color:${ratioColor};">${(ratio * 100).toFixed(0)}% — ${ratioLabel}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#6b7280;">Flood Zone</div>
+          <div style="font-size:14px;font-weight:600;color:${rprData.floodZone.isHighRisk ? "#dc2626" : "#16a34a"};">${rprData.floodZone.zone}${rprData.floodZone.isHighRisk ? " (High Risk)" : ""}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#6b7280;">Schools Avg</div>
+          <div style="font-size:14px;font-weight:600;color:#111827;">${avgSchoolRating}/10</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#6b7280;">Cap Rate</div>
+          <div style="font-size:14px;font-weight:600;color:#111827;">${rprData.investmentMetrics.estimatedCapRate.toFixed(1)}%</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderListingCard(listing: BridgeListing, analysis: ListingAnalysis, rprData?: RprData): string {
   const photo = listing.photos[0];
   const photoHtml = photo
     ? `<img src="${photo}" alt="Listing photo" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px 8px 0 0;" />`
@@ -122,6 +163,7 @@ function renderListingCard(listing: BridgeListing, analysis: ListingAnalysis): s
         <div style="font-size:14px;color:#374151;margin-bottom:16px;line-height:1.5;">${analysis.summary}</div>
         ${moduleHtml}
         ${customHtml ? `<div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:12px;">${customHtml}</div>` : ""}
+        ${rprData ? renderRprBox(rprData) : ""}
         <div style="font-size:12px;color:#9ca3af;margin-top:8px;">
           MLS# ${listing.mlsId} &middot; Listed by ${listing.agent.name}${listing.agent.office ? ` at ${listing.agent.office}` : ""}
         </div>
@@ -132,7 +174,7 @@ function renderListingCard(listing: BridgeListing, analysis: ListingAnalysis): s
 
 export function renderEmail(report: DailyReport, config: ScoutConfig): string {
   const listingsHtml = report.listings
-    .map(({ listing, analysis }) => renderListingCard(listing, analysis))
+    .map(({ listing, analysis, rprData }) => renderListingCard(listing, analysis, rprData))
     .join("");
 
   const filtersHtml = [

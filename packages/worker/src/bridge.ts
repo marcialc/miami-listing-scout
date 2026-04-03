@@ -164,9 +164,13 @@ export async function fetchNewListings(
   token: string,
   filters: ListingFilters,
   since: string,
+  until?: string,
 ): Promise<BridgeListing[]> {
   const allListings: BridgeListing[] = [];
-  const filterStr = buildFilter(filters, since);
+  let filterStr = buildFilter(filters, since);
+  if (until) {
+    filterStr += ` and ModificationTimestamp lt ${until}`;
+  }
 
   let url: string | null = `${BRIDGE_BASE}?$filter=${encodeURIComponent(filterStr)}&$top=200&$orderby=ModificationTimestamp desc`;
 

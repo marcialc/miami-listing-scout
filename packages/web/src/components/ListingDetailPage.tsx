@@ -1,18 +1,11 @@
 import { useState, useEffect } from "react";
-import type { DailyReport, BridgeListing, ListingAnalysis, AnalysisModule } from "@miami-listing-scout/shared";
+import type { DailyReport, BridgeListing, ListingAnalysis, AnalysisModule, RprData } from "@miami-listing-scout/shared";
 import { ANALYSIS_MODULES } from "@miami-listing-scout/shared";
 import { fetchReport } from "../api";
 import { ScoreBadge } from "./ScoreBadge";
 import { RecommendationBadge } from "./RecommendationBadge";
-
-const MODULE_LABELS: Record<AnalysisModule, string> = {
-  investment_potential: "Investment Potential",
-  price_vs_comps: "Price vs Comps",
-  red_flags: "Red Flags",
-  neighborhood_insights: "Neighborhood",
-  rental_analysis: "Rental Analysis",
-  flip_potential: "Flip Potential",
-};
+import { useI18n, formatCurrency, formatNumber, formatDate } from "../i18n";
+import type { Locale, TranslationKey } from "../i18n";
 
 interface ListingDetailPageProps {
   reportKey: string;
@@ -20,19 +13,21 @@ interface ListingDetailPageProps {
 }
 
 export function ListingDetailPage({ reportKey, listingId }: ListingDetailPageProps) {
+  const { locale, t } = useI18n();
   const [report, setReport] = useState<DailyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePhoto, setActivePhoto] = useState(0);
+  const [expandedModule, setExpandedModule] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     fetchReport(reportKey)
       .then(setReport)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load report"))
+      .catch((err) => setError(err instanceof Error ? err.message : t("report.loadError")))
       .finally(() => setLoading(false));
-  }, [reportKey]);
+  }, [reportKey, t]);
 
   if (loading) {
     return (
@@ -50,7 +45,7 @@ export function ListingDetailPage({ reportKey, listingId }: ListingDetailPagePro
       <div className="text-center py-12">
         <p className="text-red-600 text-sm">{error}</p>
         <a href={`#/reports?key=${encodeURIComponent(reportKey)}`} className="text-sm text-accent-600 hover:underline mt-2 inline-block">
-          Back to report
+          {t("listing.backToReport")}
         </a>
       </div>
     );
@@ -60,15 +55,15 @@ export function ListingDetailPage({ reportKey, listingId }: ListingDetailPagePro
   if (!match) {
     return (
       <div className="text-center py-12">
-        <p className="text-stone-500 text-sm">Listing not found in this report.</p>
+        <p className="text-stone-500 text-sm">{t("listing.notFound")}</p>
         <a href={`#/reports?key=${encodeURIComponent(reportKey)}`} className="text-sm text-accent-600 hover:underline mt-2 inline-block">
-          Back to report
+          {t("listing.backToReport")}
         </a>
       </div>
     );
   }
 
-  const { listing, analysis } = match;
+  const { listing, analysis, rprData } = match;
 
   return (
     <div className="space-y-8">
@@ -78,42 +73,78 @@ export function ListingDetailPage({ reportKey, listingId }: ListingDetailPagePro
         className="text-sm text-accent-600 hover:text-accent-700 flex items-center gap-1"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" /></svg>
-        Back to report
+        {t("listing.backToReport")}
       </a>
 
       {/* Photo gallery */}
       <PhotoGallery photos={listing.photos} address={listing.address.full} activeIndex={activePhoto} onSelect={setActivePhoto} />
 
       {/* Header */}
-      <ListingHeader listing={listing} analysis={analysis} />
+      <ListingHeader listing={listing} analysis={analysis} locale={locale} t={t} />
 
       {/* Property details + Financial */}
       <div className="grid gap-6 md:grid-cols-2">
-        <PropertyDetailsCard listing={listing} />
-        <FinancialCard listing={listing} />
+        <PropertyDetailsCard listing={listing} locale={locale} t={t} />
+        <FinancialCard listing={listing} locale={locale} t={t} />
       </div>
 
+      {/* RPR Data */}
+      {rprData && <RprCard rprData={rprData} locale={locale} t={t} />}
+
       {/* AI Summary */}
-      <SummaryCard analysis={analysis} />
+      <SummaryCard analysis={analysis} t={t} />
 
       {/* Analysis Modules */}
       <div className="grid gap-6 md:grid-cols-2">
         {ANALYSIS_MODULES.map((mod) => {
           const result = analysis.moduleResults[mod];
-          if (!result) return null;
+          if (!result || result.score === 0) return null;
+          const isExpanded = expandedModule === mod;
+          const visibleHighlights = isExpanded ? result.highlights : result.highlights.slice(0, 4);
+          const hiddenCount = result.highlights.length - 4;
           return (
             <div key={mod} className="bg-white rounded-xl shadow-sm ring-1 ring-stone-200 p-5">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-semibold text-stone-800">{MODULE_LABELS[mod]}</h4>
+                <h4 className="text-sm font-semibold text-stone-800">{t(`module.${mod}.label` as TranslationKey)}</h4>
                 <ScoreBadge score={result.score} size="sm" />
               </div>
-              <p className="text-sm text-stone-600 leading-relaxed">{result.analysis}</p>
-              {result.highlights.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {result.highlights.map((h, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 bg-stone-100 text-stone-600 rounded-full">{h}</span>
+              {visibleHighlights.length > 0 && (
+                <ul className="space-y-0.5 mb-2">
+                  {visibleHighlights.map((h, i) => (
+                    <li key={i} className="text-xs text-stone-600 flex items-start gap-2">
+                      <span className="text-stone-300 mt-0.5 shrink-0">–</span>
+                      {h}
+                    </li>
                   ))}
-                </div>
+                </ul>
+              )}
+              {!isExpanded && hiddenCount > 0 && (
+                <button
+                  onClick={() => setExpandedModule(mod)}
+                  className="text-xs text-stone-400 hover:text-stone-600 mb-2 cursor-pointer"
+                >
+                  {t("module.moreHighlights", { count: hiddenCount })}
+                </button>
+              )}
+              {isExpanded ? (
+                <>
+                  <p className="text-xs text-stone-400 leading-relaxed mb-2">{result.analysis}</p>
+                  <button
+                    onClick={() => setExpandedModule(null)}
+                    className="text-xs text-accent-600 hover:text-accent-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{t("module.hideDetails")}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m18 15-6-6-6 6" /></svg>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setExpandedModule(mod)}
+                  className="text-xs text-accent-600 hover:text-accent-700 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{t("module.showDetails")}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                </button>
               )}
             </div>
           );
@@ -123,26 +154,28 @@ export function ListingDetailPage({ reportKey, listingId }: ListingDetailPagePro
       {/* Property description */}
       {listing.property.description && (
         <div className="bg-white rounded-xl shadow-sm ring-1 ring-stone-200 p-5">
-          <h3 className="text-sm font-semibold text-stone-800 mb-3">Property Description</h3>
+          <h3 className="text-sm font-semibold text-stone-800 mb-3">{t("listing.propertyDescription")}</h3>
           <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-line">{listing.property.description}</p>
         </div>
       )}
 
       {/* Agent info */}
-      {listing.agent.name && <AgentCard agent={listing.agent} />}
+      {listing.agent.name && <AgentCard agent={listing.agent} t={t} />}
 
       {/* Footer metadata */}
       <div className="text-xs text-stone-400 flex flex-wrap gap-x-4 gap-y-1 pb-4">
-        <span>MLS# {listing.mlsId}</span>
-        <span>Listed {new Date(listing.dates.listed).toLocaleDateString()}</span>
-        <span>Modified {new Date(listing.dates.modified).toLocaleDateString()}</span>
-        <span>Analyzed {new Date(analysis.analyzedAt).toLocaleDateString()}</span>
+        <span>{t("listing.mls", { id: listing.mlsId })}</span>
+        <span>{t("listing.listed", { date: formatDate(listing.dates.listed, locale) })}</span>
+        <span>{t("listing.modified", { date: formatDate(listing.dates.modified, locale) })}</span>
+        <span>{t("listing.analyzed", { date: formatDate(analysis.analyzedAt, locale) })}</span>
       </div>
     </div>
   );
 }
 
 /* ── Sub-components ──────────────────────────────────────────────── */
+
+type TFn = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 function PhotoGallery({ photos, address, activeIndex, onSelect }: { photos: string[]; address: string; activeIndex: number; onSelect: (i: number) => void }) {
   if (photos.length === 0) {
@@ -179,8 +212,8 @@ function PhotoGallery({ photos, address, activeIndex, onSelect }: { photos: stri
   );
 }
 
-function ListingHeader({ listing, analysis }: { listing: BridgeListing; analysis: ListingAnalysis }) {
-  const price = listing.listPrice.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+function ListingHeader({ listing, analysis, locale, t }: { listing: BridgeListing; analysis: ListingAnalysis; locale: Locale; t: TFn }) {
+  const price = formatCurrency(listing.listPrice, locale);
 
   return (
     <div>
@@ -195,33 +228,35 @@ function ListingHeader({ listing, analysis }: { listing: BridgeListing; analysis
         </div>
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-stone-500 mt-2">
-        <span>Listed {new Date(listing.listDate).toLocaleDateString()}</span>
-        <span>MLS# {listing.mlsId}</span>
+        <span>{t("listing.listed", { date: formatDate(listing.listDate, locale) })}</span>
+        <span>{t("listing.mls", { id: listing.mlsId })}</span>
         <span>{listing.property.type}</span>
       </div>
     </div>
   );
 }
 
-function PropertyDetailsCard({ listing }: { listing: BridgeListing }) {
+function PropertyDetailsCard({ listing, locale, t }: { listing: BridgeListing; locale: Locale; t: TFn }) {
   const { bedrooms, bathrooms, bathsFull, bathsHalf, sqft, lotSize, yearBuilt, stories, garage, pool, waterfront, type } = listing.property;
 
+  const bathDetail = `${bathrooms} (${t("detail.bathsFull", { count: bathsFull })}${bathsHalf ? `, ${t("detail.bathsHalf", { count: bathsHalf })}` : ""})`;
+
   const rows: [string, string | number][] = [
-    ["Bedrooms", bedrooms],
-    ["Bathrooms", `${bathrooms} (${bathsFull} full${bathsHalf ? `, ${bathsHalf} half` : ""})`],
-    ["Sq Ft", sqft.toLocaleString()],
-    ["Lot Size", lotSize > 0 ? `${lotSize.toLocaleString()} sqft` : "N/A"],
-    ["Year Built", yearBuilt > 0 ? yearBuilt : "N/A"],
-    ["Stories", stories > 0 ? stories : "N/A"],
-    ["Garage", garage > 0 ? `${garage} spaces` : "None"],
-    ["Pool", pool ? "Yes" : "No"],
-    ["Waterfront", waterfront ? "Yes" : "No"],
-    ["Type", type],
+    [t("detail.bedrooms"), bedrooms],
+    [t("detail.bathrooms"), bathDetail],
+    [t("detail.sqft"), formatNumber(sqft, locale)],
+    [t("detail.lotSize"), lotSize > 0 ? `${formatNumber(lotSize, locale)} ${t("detail.sqftUnit")}` : t("detail.na")],
+    [t("detail.yearBuilt"), yearBuilt > 0 ? yearBuilt : t("detail.na")],
+    [t("detail.stories"), stories > 0 ? stories : t("detail.na")],
+    [t("detail.garage"), garage > 0 ? t("detail.spaces", { count: garage }) : t("detail.none")],
+    [t("detail.pool"), pool ? t("detail.yes") : t("detail.no")],
+    [t("detail.waterfront"), waterfront ? t("detail.yes") : t("detail.no")],
+    [t("detail.type"), type],
   ];
 
   return (
     <div className="bg-white rounded-xl shadow-sm ring-1 ring-stone-200 p-5">
-      <h3 className="text-sm font-semibold text-stone-800 mb-3">Property Details</h3>
+      <h3 className="text-sm font-semibold text-stone-800 mb-3">{t("listing.propertyDetails")}</h3>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         {rows.map(([label, value]) => (
           <div key={label}>
@@ -234,20 +269,20 @@ function PropertyDetailsCard({ listing }: { listing: BridgeListing }) {
   );
 }
 
-function FinancialCard({ listing }: { listing: BridgeListing }) {
+function FinancialCard({ listing, locale, t }: { listing: BridgeListing; locale: Locale; t: TFn }) {
   const price = listing.listPrice;
   const priceSqft = listing.property.sqft > 0 ? Math.round(price / listing.property.sqft) : null;
 
   const rows: [string, string][] = [
-    ["List Price", price.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })],
-    ["Price / Sq Ft", priceSqft ? `$${priceSqft.toLocaleString()}` : "N/A"],
-    ["HOA Fee", listing.financial.hoaFee != null ? `$${listing.financial.hoaFee.toLocaleString()}/mo` : "N/A"],
-    ["Tax Amount", listing.financial.taxAmount != null ? `$${listing.financial.taxAmount.toLocaleString()}${listing.financial.taxYear ? ` (${listing.financial.taxYear})` : ""}/yr` : "N/A"],
+    [t("financial.listPrice"), formatCurrency(price, locale)],
+    [t("financial.priceSqft"), priceSqft ? formatCurrency(priceSqft, locale) : t("detail.na")],
+    [t("financial.hoaFee"), listing.financial.hoaFee != null ? `${formatCurrency(listing.financial.hoaFee, locale)}${t("financial.perMonth")}` : t("detail.na")],
+    [t("financial.taxAmount"), listing.financial.taxAmount != null ? `${formatCurrency(listing.financial.taxAmount, locale)}${listing.financial.taxYear ? ` (${listing.financial.taxYear})` : ""}${t("financial.perYear")}` : t("detail.na")],
   ];
 
   return (
     <div className="bg-white rounded-xl shadow-sm ring-1 ring-stone-200 p-5">
-      <h3 className="text-sm font-semibold text-stone-800 mb-3">Financial</h3>
+      <h3 className="text-sm font-semibold text-stone-800 mb-3">{t("listing.financial")}</h3>
       <dl className="space-y-2 text-sm">
         {rows.map(([label, value]) => (
           <div key={label} className="flex justify-between">
@@ -260,11 +295,11 @@ function FinancialCard({ listing }: { listing: BridgeListing }) {
   );
 }
 
-function SummaryCard({ analysis }: { analysis: ListingAnalysis }) {
+function SummaryCard({ analysis, t }: { analysis: ListingAnalysis; t: TFn }) {
   return (
     <div className="bg-white rounded-xl shadow-sm ring-1 ring-stone-200 p-5">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-stone-800">AI Summary</h3>
+        <h3 className="text-sm font-semibold text-stone-800">{t("listing.aiSummary")}</h3>
         <div className="flex items-center gap-2">
           <RecommendationBadge rec={analysis.recommendation} />
           <ScoreBadge score={analysis.overallScore} size="sm" />
@@ -275,10 +310,124 @@ function SummaryCard({ analysis }: { analysis: ListingAnalysis }) {
   );
 }
 
-function AgentCard({ agent }: { agent: BridgeListing["agent"] }) {
+function RprCard({ rprData, locale, t }: { rprData: RprData; locale: Locale; t: TFn }) {
+  const ratio = rprData.valuation.priceToValueRatio;
+  const ratioColor = ratio <= 0.95 ? "text-green-600" : ratio >= 1.05 ? "text-red-600" : "text-amber-600";
+  const ratioLabel = ratio <= 0.95 ? t("rpr.underpriced") : ratio >= 1.05 ? t("rpr.overpriced") : t("rpr.fairValue");
+  const avgSchoolRating = rprData.schools.length > 0
+    ? (rprData.schools.reduce((sum, s) => sum + s.rating, 0) / rprData.schools.length).toFixed(1)
+    : null;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm ring-1 ring-sky-200 p-5">
+      <h3 className="text-sm font-semibold text-sky-700 mb-4">{t("rpr.valuation")}</h3>
+
+      {/* Valuation */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+        <div>
+          <dt className="text-xs text-stone-400">{t("rpr.estimatedValue")}</dt>
+          <dd className="text-sm font-semibold text-stone-800">{formatCurrency(rprData.valuation.estimatedValue, locale)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-stone-400">{t("rpr.priceToValue")}</dt>
+          <dd className={`text-sm font-semibold ${ratioColor}`}>{(ratio * 100).toFixed(0)}% — {ratioLabel}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-stone-400">{t("rpr.confidence")}</dt>
+          <dd className="text-sm font-semibold text-stone-800">{rprData.valuation.confidenceScore}/100</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-stone-400">{t("rpr.floodZone")}</dt>
+          <dd className={`text-sm font-semibold ${rprData.floodZone.isHighRisk ? "text-red-600" : "text-green-600"}`}>
+            {rprData.floodZone.zone} — {rprData.floodZone.isHighRisk ? t("rpr.highRisk") : t("rpr.lowRisk")}
+          </dd>
+        </div>
+      </div>
+
+      {/* Neighborhood */}
+      <div className="border-t border-stone-100 pt-3 mb-3">
+        <h4 className="text-xs font-semibold text-stone-500 mb-2">{t("rpr.neighborhood")}</h4>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <dt className="text-xs text-stone-400">{t("rpr.appreciation1Yr")}</dt>
+            <dd className="text-sm font-medium text-stone-700">{rprData.neighborhood.appreciationRate1Yr.toFixed(1)}%</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-stone-400">{t("rpr.appreciation5Yr")}</dt>
+            <dd className="text-sm font-medium text-stone-700">{rprData.neighborhood.appreciationRate5Yr.toFixed(1)}%</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-stone-400">{t("rpr.medianValue")}</dt>
+            <dd className="text-sm font-medium text-stone-700">{formatCurrency(rprData.neighborhood.medianHomeValue, locale)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-stone-400">{t("rpr.medianIncome")}</dt>
+            <dd className="text-sm font-medium text-stone-700">{formatCurrency(rprData.neighborhood.medianHouseholdIncome, locale)}</dd>
+          </div>
+        </div>
+      </div>
+
+      {/* Schools */}
+      {rprData.schools.length > 0 && (
+        <div className="border-t border-stone-100 pt-3 mb-3">
+          <h4 className="text-xs font-semibold text-stone-500 mb-2">
+            {t("rpr.schools")} {avgSchoolRating && <span className="text-stone-400 font-normal">(avg {avgSchoolRating}/10)</span>}
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {rprData.schools.map((school) => (
+              <span key={school.name} className="text-xs bg-stone-50 rounded-full px-2.5 py-1 text-stone-600">
+                {school.name} <span className="font-semibold">{school.rating}/10</span> · {school.distanceMiles.toFixed(1)}mi
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Investment Metrics */}
+      <div className="border-t border-stone-100 pt-3 mb-3">
+        <h4 className="text-xs font-semibold text-stone-500 mb-2">{t("rpr.investmentMetrics")}</h4>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <dt className="text-xs text-stone-400">{t("rpr.capRate")}</dt>
+            <dd className="text-sm font-medium text-stone-700">{rprData.investmentMetrics.estimatedCapRate.toFixed(1)}%</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-stone-400">{t("rpr.monthlyCashFlow")}</dt>
+            <dd className="text-sm font-medium text-stone-700">{formatCurrency(rprData.investmentMetrics.estimatedMonthlyCashFlow, locale)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-stone-400">{t("rpr.monthlyRent")}</dt>
+            <dd className="text-sm font-medium text-stone-700">{formatCurrency(rprData.investmentMetrics.estimatedMonthlyRent, locale)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-stone-400">{t("rpr.grm")}</dt>
+            <dd className="text-sm font-medium text-stone-700">{rprData.investmentMetrics.grossRentMultiplier.toFixed(1)}x</dd>
+          </div>
+        </div>
+      </div>
+
+      {/* Tax History */}
+      {rprData.taxHistory.length > 0 && (
+        <div className="border-t border-stone-100 pt-3">
+          <h4 className="text-xs font-semibold text-stone-500 mb-2">{t("rpr.taxHistory")}</h4>
+          <div className="space-y-1">
+            {rprData.taxHistory.slice(0, 5).map((tax) => (
+              <div key={tax.year} className="flex justify-between text-xs text-stone-600">
+                <span>{tax.year}</span>
+                <span>Assessed: {formatCurrency(tax.assessedValue, locale)} · Tax: {formatCurrency(tax.taxAmount, locale)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AgentCard({ agent, t }: { agent: BridgeListing["agent"]; t: TFn }) {
   return (
     <div className="bg-white rounded-xl shadow-sm ring-1 ring-stone-200 p-5">
-      <h3 className="text-sm font-semibold text-stone-800 mb-3">Listing Agent</h3>
+      <h3 className="text-sm font-semibold text-stone-800 mb-3">{t("listing.listingAgent")}</h3>
       <div className="text-sm text-stone-600 space-y-1">
         <p className="font-medium text-stone-700">{agent.name}</p>
         {agent.office && <p>{agent.office}</p>}

@@ -18,7 +18,7 @@ pnpm typecheck   # tsc --noEmit
 |------|---------|
 | `src/index.ts` | HTTP API routes + cron handler + pipeline orchestrator |
 | `src/bridge.ts` | Bridge Interactive API client (OData, pagination, field mapping) |
-| `src/analyzer.ts` | Claude Haiku 4.5 analysis engine (batched, 6 modules) |
+| `src/analyzer.ts` | Claude Haiku 4.5 analysis engine (batched, 6 modules, locale-aware) |
 | `src/email.ts` | Report builder + HTML renderer + Resend sender |
 | `src/config.ts` | KV config/state management (config, dedup, timestamps) |
 | `src/mock.ts` | 5 realistic Miami mock listings for testing |
@@ -60,7 +60,7 @@ Two namespaces bound in `wrangler.toml`:
 
 - Cron: `0 12 * * *` (daily at 12:00 UTC / 7 AM EST)
 - Bridge API: OData protocol, 200 records/page, `miamire` dataset
-- Claude API: Direct HTTP calls (no SDK), structured JSON responses only
+- Claude API: Direct HTTP calls (no SDK), structured JSON responses only, analysis text language driven by `config.locale`
 - Resend: Direct HTTP POST
 - CORS headers on all API responses
 - Errors are logged with `[component]` prefixes, pipeline continues on partial failures

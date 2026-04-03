@@ -5,7 +5,7 @@ interface ToastProps {
 
 export function Toast({ message, type }: ToastProps) {
   return (
-    <div className="fixed top-4 right-4 z-50 animate-[slideIn_0.2s_ease-out]">
+    <div className="fixed bottom-4 right-4 z-50 animate-[slideIn_0.2s_ease-out]">
       <div
         className={`px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
           type === "success"

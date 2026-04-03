@@ -25,10 +25,11 @@ pnpm dev         # tsc --watch
 **Types:**
 - `AnalysisModule` — Union of the 6 module names
 - `Recommendation` — `"strong_buy" | "buy" | "watch" | "pass"`
+- `Locale` — `"en" | "es"`
 
 **Interfaces:**
 - `ListingFilters` — Search criteria (cities, price, beds/baths, sqft, property types, keywords)
-- `ScoutConfig` — Full config (user info, filters, modules, custom requirements, schedule)
+- `ScoutConfig` — Full config (user info, locale, filters, modules, custom requirements, schedule)
 - `BridgeListing` — Normalized MLS listing (address, property, photos, agent, geo, dates, financial)
 - `ModuleResult` — Single module output (score, analysis, highlights)
 - `ListingAnalysis` — Full analysis (overall score, module results, recommendation)

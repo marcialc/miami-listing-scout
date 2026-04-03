@@ -2,13 +2,21 @@ import type { ScoutConfig } from "@miami-listing-scout/shared";
 import { TagInput } from "./TagInput";
 import { CityAutocomplete } from "./CityAutocomplete";
 import { SectionCard } from "./SectionCard";
+import { useI18n } from "../i18n";
+import type { TranslationKey } from "../i18n";
 
 interface Props {
   config: ScoutConfig;
   updateConfig: (fn: (prev: ScoutConfig) => ScoutConfig) => void;
 }
 
-const PROPERTY_TYPES = ["Single Family", "Condo", "Townhouse", "Multi-Family", "Land"];
+const PROPERTY_TYPES: { value: string; labelKey: TranslationKey }[] = [
+  { value: "Single Family", labelKey: "propertyType.singleFamily" },
+  { value: "Condo", labelKey: "propertyType.condo" },
+  { value: "Townhouse", labelKey: "propertyType.townhouse" },
+  { value: "Multi-Family", labelKey: "propertyType.multiFamily" },
+  { value: "Land", labelKey: "propertyType.land" },
+];
 
 function NumberInput({
   value,
@@ -50,6 +58,8 @@ function RangeSelect({
   onMinChange,
   onMaxChange,
   options,
+  noMinLabel,
+  noMaxLabel,
 }: {
   label: string;
   min: number | undefined;
@@ -57,6 +67,8 @@ function RangeSelect({
   onMinChange: (v: number | undefined) => void;
   onMaxChange: (v: number | undefined) => void;
   options: { value: number; label: string }[];
+  noMinLabel: string;
+  noMaxLabel: string;
 }) {
   return (
     <div>
@@ -67,7 +79,7 @@ function RangeSelect({
           onChange={(e) => onMinChange(e.target.value ? Number(e.target.value) : undefined)}
           className="text-sm border border-stone-300 rounded-lg py-2.5 px-3 bg-white text-stone-800 focus:border-accent-500 focus:ring-1 focus:ring-accent-500 outline-none transition-colors cursor-pointer"
         >
-          <option value="">No min</option>
+          <option value="">{noMinLabel}</option>
           {options.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -77,7 +89,7 @@ function RangeSelect({
           onChange={(e) => onMaxChange(e.target.value ? Number(e.target.value) : undefined)}
           className="text-sm border border-stone-300 rounded-lg py-2.5 px-3 bg-white text-stone-800 focus:border-accent-500 focus:ring-1 focus:ring-accent-500 outline-none transition-colors cursor-pointer"
         >
-          <option value="">No max</option>
+          <option value="">{noMaxLabel}</option>
           {options.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -91,6 +103,7 @@ const BED_OPTIONS = [1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: `${n}${n =
 const BATH_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({ value: n, label: `${n}${n === 5 ? "+" : ""}` }));
 
 export function FiltersSection({ config, updateConfig }: Props) {
+  const { t } = useI18n();
   const f = config.baseFilters;
 
   function updateFilter<K extends keyof typeof f>(key: K, value: (typeof f)[K]) {
@@ -102,32 +115,32 @@ export function FiltersSection({ config, updateConfig }: Props) {
 
   return (
     <SectionCard
-      title="Search Filters"
-      description="Define what listings to scout for you each day"
+      title={t("filters.title")}
+      description={t("filters.description")}
     >
       <div className="flex flex-col gap-5">
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1.5">Cities</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1.5">{t("filters.cities")}</label>
           <CityAutocomplete
             selected={f.cities}
             onChange={(v) => updateFilter("cities", v)}
-            placeholder="Search for a city..."
+            placeholder={t("filters.searchCityPlaceholder")}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1.5">Price Range</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1.5">{t("filters.priceRange")}</label>
           <div className="grid grid-cols-2 gap-3">
             <NumberInput
               value={f.minPrice}
               onChange={(v) => updateFilter("minPrice", v)}
-              placeholder="Min"
+              placeholder={t("filters.min")}
               prefix="$"
             />
             <NumberInput
               value={f.maxPrice}
               onChange={(v) => updateFilter("maxPrice", v)}
-              placeholder="Max"
+              placeholder={t("filters.max")}
               prefix="$"
             />
           </div>
@@ -135,54 +148,58 @@ export function FiltersSection({ config, updateConfig }: Props) {
 
         <div className="grid grid-cols-2 gap-5">
           <RangeSelect
-            label="Bedrooms"
+            label={t("filters.bedrooms")}
             min={f.minBeds}
             max={f.maxBeds}
             onMinChange={(v) => updateFilter("minBeds", v)}
             onMaxChange={(v) => updateFilter("maxBeds", v)}
             options={BED_OPTIONS}
+            noMinLabel={t("filters.noMin")}
+            noMaxLabel={t("filters.noMax")}
           />
           <RangeSelect
-            label="Bathrooms"
+            label={t("filters.bathrooms")}
             min={f.minBaths}
             max={f.maxBaths}
             onMinChange={(v) => updateFilter("minBaths", v)}
             onMaxChange={(v) => updateFilter("maxBaths", v)}
             options={BATH_OPTIONS}
+            noMinLabel={t("filters.noMin")}
+            noMaxLabel={t("filters.noMax")}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1.5">Square Footage</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1.5">{t("filters.sqft")}</label>
           <div className="grid grid-cols-2 gap-3">
             <NumberInput
               value={f.minSqft}
               onChange={(v) => updateFilter("minSqft", v)}
-              placeholder="Min sqft"
+              placeholder={t("filters.minSqft")}
             />
             <NumberInput
               value={f.maxSqft}
               onChange={(v) => updateFilter("maxSqft", v)}
-              placeholder="Max sqft"
+              placeholder={t("filters.maxSqft")}
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1.5">Property Types</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1.5">{t("filters.propertyTypes")}</label>
           <div className="flex flex-wrap gap-2">
-            {PROPERTY_TYPES.map((type) => {
-              const active = f.propertyTypes.includes(type);
+            {PROPERTY_TYPES.map(({ value, labelKey }) => {
+              const active = f.propertyTypes.includes(value);
               return (
                 <button
-                  key={type}
+                  key={value}
                   type="button"
                   onClick={() => {
                     updateFilter(
                       "propertyTypes",
                       active
-                        ? f.propertyTypes.filter((t) => t !== type)
-                        : [...f.propertyTypes, type],
+                        ? f.propertyTypes.filter((t) => t !== value)
+                        : [...f.propertyTypes, value],
                     );
                   }}
                   className={`px-3.5 py-2 text-sm rounded-lg border transition-colors cursor-pointer ${
@@ -191,7 +208,7 @@ export function FiltersSection({ config, updateConfig }: Props) {
                       : "bg-white border-stone-300 text-stone-600 hover:border-stone-400"
                   }`}
                 >
-                  {type}
+                  {t(labelKey)}
                 </button>
               );
             })}
@@ -199,13 +216,13 @@ export function FiltersSection({ config, updateConfig }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1.5">Keywords</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1.5">{t("filters.keywords")}</label>
           <TagInput
             tags={f.keywords}
             onChange={(v) => updateFilter("keywords", v)}
-            placeholder="Search terms for MLS remarks..."
+            placeholder={t("filters.keywordsPlaceholder")}
           />
-          <p className="mt-1 text-xs text-stone-400">Matches against the listing's public remarks</p>
+          <p className="mt-1 text-xs text-stone-400">{t("filters.keywordsHelp")}</p>
         </div>
       </div>
     </SectionCard>

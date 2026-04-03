@@ -48,6 +48,7 @@ pnpm deploy:web       # Deploy web UI to Cloudflare Pages
 - `packages/worker/wrangler.toml` — Worker config (KV bindings, cron, vars)
 - `packages/web/src/App.tsx` — Main dashboard component
 - `packages/web/src/api.ts` — Worker API client
+- `packages/web/src/i18n/` — i18n system (EN/ES translations, formatting, React context provider)
 
 ## Environment & Secrets
 
@@ -65,3 +66,4 @@ Local dev secrets go in `packages/worker/.dev.vars`.
 - Shared types live in `packages/shared`, imported as `@miami-listing-scout/shared`
 - Worker uses Cloudflare Workers API patterns (fetch handler, scheduled handler, KV bindings)
 - API auth via `X-API-Key` header matching `CONFIG_API_KEY`
+- i18n: Custom React Context (no library). English/Spanish. Translations in `packages/web/src/i18n/en.ts` and `es.ts`. `es.ts` is typed as `Record<TranslationKey, string>` so missing keys are compile errors. Locale persisted in `ScoutConfig.locale` and `localStorage`. Worker generates AI analysis in the user's chosen language.

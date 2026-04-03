@@ -25,7 +25,7 @@ pnpm preview     # vite preview (serve built output)
 
 | File | Purpose |
 |------|---------|
-| `src/main.tsx` | Entry point, renders App in StrictMode |
+| `src/main.tsx` | Entry point, renders App in StrictMode, wraps with I18nProvider |
 | `src/App.tsx` | Main component — state management, API calls, layout |
 | `src/api.ts` | Worker API client (fetchHealth, fetchConfig, saveConfig, triggerTestRun) |
 | `src/index.css` | Tailwind import + custom theme (font, accent colors) |
@@ -37,6 +37,10 @@ pnpm preview     # vite preview (serve built output)
 | `src/components/SectionCard.tsx` | Reusable card wrapper (title, description, content) |
 | `src/components/TagInput.tsx` | Reusable tag/pill input (Enter/comma to add, backspace to remove) |
 | `src/components/Toast.tsx` | Success/error notification (top-right, animated) |
+| `src/i18n/en.ts` | English translations (~150 keys), exports `TranslationKey` type |
+| `src/i18n/es.ts` | Spanish translations, typed as `Record<TranslationKey, string>` |
+| `src/i18n/format.ts` | Locale-aware currency, number, date, time formatting |
+| `src/i18n/index.tsx` | `I18nProvider` (React Context), `useI18n()` hook, re-exports |
 
 ## State Management
 
@@ -44,6 +48,20 @@ pnpm preview     # vite preview (serve built output)
 - Config object is the single source of truth
 - Child components receive `updateConfig` callback for mutations
 - Change detection by comparing current config vs last saved config
+
+## i18n
+
+- Custom React Context — no external library, zero new dependencies
+- Two languages: English (`en`) and Spanish (`es`)
+- Translations are flat key-value objects in `src/i18n/en.ts` and `es.ts`
+- `es.ts` is typed as `Record<TranslationKey, string>` — missing Spanish keys cause compile errors
+- `useI18n()` hook provides `{ locale, setLocale, t }` — `t(key, params?)` looks up translation and replaces `{param}` placeholders
+- Locale-aware formatting helpers: `formatCurrency`, `formatNumber`, `formatDate`, `formatTime` (uses `en-US` / `es-US`)
+- Locale persisted to `localStorage("miami-scout-locale")` and to `ScoutConfig.locale` on save
+- On first visit, auto-detects browser language (`navigator.language` starting with `"es"`)
+- On config load, syncs saved `config.locale` to the i18n context
+- EN/ES toggle in Header component
+- Property type API values stay English regardless of UI language (display is translated)
 
 ## API Integration
 

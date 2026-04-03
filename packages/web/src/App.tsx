@@ -3,7 +3,10 @@ import type { ScoutConfig } from "@miami-listing-scout/shared";
 import { DEFAULT_CONFIG } from "@miami-listing-scout/shared";
 import { fetchConfig, saveConfig as apiSaveConfig, fetchHealth, triggerTestRun } from "./api";
 import type { HealthStatus } from "./api";
+import { useI18n } from "./i18n";
+import type { Locale } from "./i18n";
 import { Header } from "./components/Header";
+import { RunModal } from "./components/RunModal";
 import { FiltersSection } from "./components/FiltersSection";
 import { AnalysisSection } from "./components/AnalysisSection";
 import { EmailScheduleSection } from "./components/EmailScheduleSection";
@@ -47,6 +50,7 @@ function getDefaultConfig(): ScoutConfig {
 }
 
 export default function App() {
+  const { locale, setLocale, t } = useI18n();
   const [page, setPage] = useState<Page>(parseHash);
   const [config, setConfig] = useState<ScoutConfig>(getDefaultConfig);
   const [savedConfig, setSavedConfig] = useState<ScoutConfig>(getDefaultConfig);
@@ -55,6 +59,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [runningTest, setRunningTest] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [showRunModal, setShowRunModal] = useState(false);
 
   const hasChanges = JSON.stringify(config) !== JSON.stringify(savedConfig);
 
@@ -71,6 +76,9 @@ export default function App() {
     ]).then(([cfg, h]) => {
       setConfig(cfg);
       setSavedConfig(cfg);
+      if (cfg.locale && (cfg.locale === "en" || cfg.locale === "es")) {
+        setLocale(cfg.locale as Locale);
+      }
       setHealth(h);
       setLoading(false);
     });
@@ -84,27 +92,31 @@ export default function App() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      await apiSaveConfig(config);
-      setSavedConfig(config);
-      showToast("Settings saved successfully", "success");
+      const configWithLocale = { ...config, locale };
+      await apiSaveConfig(configWithLocale);
+      setConfig(configWithLocale);
+      setSavedConfig(configWithLocale);
+      showToast(t("toast.saveSuccess"), "success");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to save settings", "error");
+      showToast(err instanceof Error ? err.message : t("toast.saveFailed"), "error");
     } finally {
       setSaving(false);
     }
-  }, [config, showToast]);
+  }, [config, locale, showToast, t]);
 
-  const handleRunNow = useCallback(async () => {
+  const handleRunNow = useCallback(async (date: string | null, runLocale: Locale) => {
+    setShowRunModal(false);
     setRunningTest(true);
     try {
-      const result = await triggerTestRun();
-      showToast(result, "success");
+      const result = await triggerTestRun(date ?? undefined, runLocale);
+      const message = result === "No new listings found" ? t("toast.noNewListings") : result;
+      showToast(message, "success");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to trigger scan", "error");
+      showToast(err instanceof Error ? err.message : t("toast.scanFailed"), "error");
     } finally {
       setRunningTest(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const updateConfig = useCallback((updater: (prev: ScoutConfig) => ScoutConfig) => {
     setConfig(updater);
@@ -113,7 +125,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="text-stone-400 text-sm">Loading configuration...</div>
+        <div className="text-stone-400 text-sm">{t("loading.config")}</div>
       </div>
     );
   }
@@ -123,10 +135,17 @@ export default function App() {
       <Header
         health={health}
         runningTest={runningTest}
-        onRunNow={handleRunNow}
+        onRunClick={() => setShowRunModal(true)}
         schedule={config.schedule}
         currentPage={page.name === "settings" ? "settings" : "reports"}
+      />
 
+      <RunModal
+        open={showRunModal}
+        onClose={() => setShowRunModal(false)}
+        onRun={handleRunNow}
+        runningTest={runningTest}
+        defaultLocale={config.locale as Locale ?? locale}
       />
 
       {health?.mockMode && (
@@ -138,7 +157,7 @@ export default function App() {
               <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
             <span>
-              <strong>Mock Mode</strong> — Worker is using sample listings instead of the Bridge API.
+              <strong>{t("mock.label")}</strong> — {t("mock.description")}
             </span>
           </div>
         </div>
@@ -152,8 +171,8 @@ export default function App() {
             <EmailScheduleSection config={config} updateConfig={updateConfig} />
           </>
         )}
-        {page.name === "reports" && <ReportsPage />}
-        {page.name === "report-detail" && <ReportDetail reportKey={page.key} />}
+        {page.name === "reports" && <ReportsPage onDelete={showToast} />}
+        {page.name === "report-detail" && <ReportDetail reportKey={page.key} onDelete={showToast} />}
         {page.name === "listing-detail" && <ListingDetailPage reportKey={page.key} listingId={page.listingId} />}
       </main>
 

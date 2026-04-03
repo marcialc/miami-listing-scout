@@ -80,13 +80,25 @@ export async function saveConfig(config: ScoutConfig): Promise<void> {
   }
 }
 
-export async function triggerTestRun(): Promise<string> {
+export async function triggerTestRun(since?: string, locale?: string): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/api/test-run`, {
+    const payload: Record<string, string> = {};
+    if (since) {
+      payload.since = since + "T00:00:00.000Z";
+      payload.until = since + "T23:59:59.999Z";
+    }
+    if (locale) {
+      payload.locale = locale;
+    }
+    const options: RequestInit = {
       method: "POST",
       headers: headers(),
-    });
+    };
+    if (Object.keys(payload).length > 0) {
+      options.body = JSON.stringify(payload);
+    }
+    res = await fetch(`${API_URL}/api/test-run`, options);
   } catch (err) {
     throw new Error(friendlyError(err));
   }
@@ -105,6 +117,22 @@ export async function fetchReports(): Promise<ReportSummary[]> {
   } catch (err) {
     console.warn("Failed to fetch reports:", err);
     return [];
+  }
+}
+
+export async function deleteReport(key: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/reports?key=${encodeURIComponent(key)}`, {
+      method: "DELETE",
+      headers: headers(),
+    });
+  } catch (err) {
+    throw new Error(friendlyError(err));
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(body.error ?? `Delete failed (HTTP ${res.status})`);
   }
 }
 

@@ -1,4 +1,6 @@
 import type { Recommendation } from "@miami-listing-scout/shared";
+import { useI18n } from "../i18n";
+import type { TranslationKey } from "../i18n";
 
 const STYLES: Record<Recommendation, string> = {
   strong_buy: "bg-emerald-100 text-emerald-800 ring-emerald-300",
@@ -7,17 +9,11 @@ const STYLES: Record<Recommendation, string> = {
   pass: "bg-red-100 text-red-800 ring-red-300",
 };
 
-const LABELS: Record<Recommendation, string> = {
-  strong_buy: "Strong Buy",
-  buy: "Buy",
-  watch: "Watch",
-  pass: "Pass",
-};
-
 export function RecommendationBadge({ rec }: { rec: Recommendation }) {
+  const { t } = useI18n();
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${STYLES[rec]}`}>
-      {LABELS[rec]}
+      {t(`rec.${rec}` as TranslationKey)}
     </span>
   );
 }

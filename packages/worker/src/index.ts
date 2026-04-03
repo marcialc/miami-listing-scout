@@ -1,9 +1,10 @@
 import { fetchNewListings } from "./bridge";
 import { analyzeListings } from "./analyzer";
 import { buildReport, renderEmail, sendReport } from "./email";
-import { getConfig, getLastRunTimestamp, hasSeenListing, markListingsSeen, saveConfig, setLastRunTimestamp, saveReport, getReportIndex, getReport } from "./config";
+import { enrichWithRpr } from "./rpr";
+import { getConfig, getLastRunTimestamp, hasSeenListing, markListingsSeen, saveConfig, setLastRunTimestamp, saveReport, getReportIndex, getReport, deleteReport } from "./config";
 import { MOCK_LISTINGS } from "./mock";
-import type { ScoutConfig } from "@miami-listing-scout/shared";
+import type { ScoutConfig, Locale, RprData } from "@miami-listing-scout/shared";
 import { MLS_CITIES } from "@miami-listing-scout/shared";
 
 export interface Env {
@@ -15,6 +16,7 @@ export interface Env {
   CONFIG_API_KEY: string;
   EMAIL_FROM: string;
   MOCK_MODE: string;
+  RPR_API_TOKEN?: string;
 }
 
 function isMockMode(env: Env): boolean {
@@ -23,10 +25,11 @@ function isMockMode(env: Env): boolean {
 
 // ── Pipeline ────────────────────────────────────────────────────
 
-async function runPipeline(env: Env, preloadedConfig?: ScoutConfig): Promise<string> {
+async function runPipeline(env: Env, preloadedConfig?: ScoutConfig, dateOverride?: { since: string; until: string }): Promise<string> {
   const startTime = Date.now();
   const mock = isMockMode(env);
-  console.log(`[pipeline] Starting daily listing scan${mock ? " (MOCK MODE)" : ""}`);
+  const isHistorical = !!dateOverride;
+  console.log(`[pipeline] Starting ${isHistorical ? "historical" : "daily"} listing scan${mock ? " (MOCK MODE)" : ""}${isHistorical ? ` (${dateOverride.since} to ${dateOverride.until})` : ""}`);
 
   console.log("env.EMAIL_FROM: ",env.EMAIL_FROM)
   // 1. Load config (use preloaded if available to avoid redundant KV read)
@@ -36,9 +39,9 @@ async function runPipeline(env: Env, preloadedConfig?: ScoutConfig): Promise<str
     return "Skipped: no email configured";
   }
 
-  // 2. Get last run timestamp
-  const since = await getLastRunTimestamp(env.SCOUT_CONFIG);
-  console.log(`[pipeline] Fetching listings since ${since}`);
+  // 2. Get last run timestamp (use dateOverride if provided)
+  const since = dateOverride ? dateOverride.since : await getLastRunTimestamp(env.SCOUT_CONFIG);
+  console.log(`[pipeline] Fetching listings since ${since}${dateOverride ? ` until ${dateOverride.until}` : ""}`);
 
   // 3. Fetch listings — mock or real
   let allListings;
@@ -47,7 +50,7 @@ async function runPipeline(env: Env, preloadedConfig?: ScoutConfig): Promise<str
     allListings = MOCK_LISTINGS;
   } else {
     try {
-      allListings = await fetchNewListings(env.BRIDGE_API_TOKEN, config.baseFilters, since);
+      allListings = await fetchNewListings(env.BRIDGE_API_TOKEN, config.baseFilters, since, dateOverride?.until);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[pipeline] Bridge API failed: ${msg}`);
@@ -58,15 +61,21 @@ async function runPipeline(env: Env, preloadedConfig?: ScoutConfig): Promise<str
   const totalFetched = allListings.length;
   console.log(`[pipeline] Fetched ${totalFetched} listings`);
 
-  // 4. Filter out already-seen listings
-  const seenChecks = await Promise.all(
-    allListings.map(async (l) => ({
-      listing: l,
-      seen: await hasSeenListing(env.SEEN_LISTINGS, l.listingId),
-    })),
-  );
-  const newListings = seenChecks.filter((c) => !c.seen).map((c) => c.listing);
-  console.log(`[pipeline] ${newListings.length} new listings after dedup (${totalFetched - newListings.length} already seen)`);
+  // 4. Filter out already-seen listings (skip dedup for historical scans)
+  let newListings;
+  if (isHistorical) {
+    newListings = allListings;
+    console.log(`[pipeline] ${newListings.length} listings (dedup skipped for historical scan)`);
+  } else {
+    const seenChecks = await Promise.all(
+      allListings.map(async (l) => ({
+        listing: l,
+        seen: await hasSeenListing(env.SEEN_LISTINGS, l.listingId),
+      })),
+    );
+    newListings = seenChecks.filter((c) => !c.seen).map((c) => c.listing);
+    console.log(`[pipeline] ${newListings.length} new listings after dedup (${totalFetched - newListings.length} already seen)`);
+  }
 
   // 5. If no new matches, skip report and email
   if (newListings.length === 0) {
@@ -75,20 +84,35 @@ async function runPipeline(env: Env, preloadedConfig?: ScoutConfig): Promise<str
     return "No new listings found";
   }
 
-  // 6. Analyze matches with Haiku
-  const analyses = await analyzeListings(newListings, config, env.ANTHROPIC_API_KEY);
+  // 6. RPR enrichment (optional)
+  let rprDataMap = new Map<string, RprData>();
+  if (config.rprEnabled && env.RPR_API_TOKEN) {
+    try {
+      rprDataMap = await enrichWithRpr(env.RPR_API_TOKEN, newListings, env.SCOUT_CONFIG);
+      console.log(`[pipeline] RPR enrichment: ${rprDataMap.size}/${newListings.length} listings enriched`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[pipeline] RPR enrichment failed (continuing without): ${msg}`);
+    }
+  } else if (config.rprEnabled && !env.RPR_API_TOKEN) {
+    console.warn("[pipeline] RPR enabled but RPR_API_TOKEN not set — skipping enrichment");
+  }
+
+  // 7. Analyze matches with Haiku
+  const analyses = await analyzeListings(newListings, config, env.ANTHROPIC_API_KEY, rprDataMap);
   const failedCount = newListings.length - analyses.length;
   console.log(`[pipeline] ${analyses.length}/${newListings.length} listings analyzed${failedCount > 0 ? ` (${failedCount} failed)` : ""}`);
 
-  // 7. Cap listings to maxListingsPerReport (sort by score descending to pick best N; buildReport re-sorts)
+  // 8. Cap listings to maxListingsPerReport (sort by score descending to pick best N; buildReport re-sorts)
   const maxListings = config.maxListingsPerReport;
   const cappedAnalyses = analyses
     .slice()
     .sort((a, b) => b.overallScore - a.overallScore)
     .slice(0, maxListings);
 
-  // 8. Build report, persist to KV, then send email
-  const report = buildReport(newListings, cappedAnalyses, config, totalFetched, failedCount);
+  // 9. Build report, persist to KV, then send email
+  const reportDate = dateOverride ? dateOverride.since.split("T")[0] : undefined;
+  const report = buildReport(newListings, cappedAnalyses, config, totalFetched, failedCount, reportDate, rprDataMap);
   await saveReport(env.SCOUT_CONFIG, report);
   const html = renderEmail(report, config);
 
@@ -102,14 +126,16 @@ async function runPipeline(env: Env, preloadedConfig?: ScoutConfig): Promise<str
     // Continue to mark as seen even if email fails
   }
 
-  // 9. Mark all processed listings as seen
+  // 10. Mark all processed listings as seen
   await markListingsSeen(
     env.SEEN_LISTINGS,
     newListings.map((l) => l.listingId),
   );
 
-  // 10. Update last run timestamp
-  await setLastRunTimestamp(env.SCOUT_CONFIG, new Date().toISOString());
+  // 11. Update last run timestamp (skip for historical scans)
+  if (!isHistorical) {
+    await setLastRunTimestamp(env.SCOUT_CONFIG, new Date().toISOString());
+  }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   const summary = `Done in ${elapsed}s — ${totalFetched} fetched, ${newListings.length} new, ${analyses.length} analyzed${failedCount > 0 ? `, ${failedCount} failed` : ""}`;
@@ -123,7 +149,7 @@ function corsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get("Origin") ?? "*";
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, PUT, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
     "Access-Control-Max-Age": "86400",
   };
@@ -191,9 +217,26 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
 
   // POST /api/test-run
   if (path === "/api/test-run" && request.method === "POST") {
-    console.log("[api] Manual test run triggered");
+    let dateOverride: { since: string; until: string } | undefined;
+    let localeOverride: Locale | undefined;
     try {
-      const result = await runPipeline(env);
+      const body = await request.json() as { since?: string; until?: string; locale?: string };
+      if (body.since && body.until) {
+        dateOverride = { since: body.since, until: body.until };
+      }
+      if (body.locale === "en" || body.locale === "es") {
+        localeOverride = body.locale;
+      }
+    } catch { /* no body or invalid JSON — run normally */ }
+
+    console.log(`[api] Manual test run triggered${dateOverride ? ` (historical: ${dateOverride.since} to ${dateOverride.until})` : ""}${localeOverride ? ` (locale: ${localeOverride})` : ""}`);
+    try {
+      let config: ScoutConfig | undefined;
+      if (localeOverride) {
+        config = await getConfig(env.SCOUT_CONFIG);
+        config = { ...config, locale: localeOverride };
+      }
+      const result = await runPipeline(env, config, dateOverride);
       return jsonResponse({ status: "done", message: result }, request);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -213,6 +256,16 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     }
     const index = await getReportIndex(env.SCOUT_CONFIG);
     return jsonResponse(index, request);
+  }
+
+  // DELETE /api/reports?key=report:...
+  if (path === "/api/reports" && request.method === "DELETE") {
+    const key = url.searchParams.get("key");
+    if (!key) {
+      return jsonResponse({ error: "Missing 'key' query parameter" }, request, 400);
+    }
+    await deleteReport(env.SCOUT_CONFIG, env.SEEN_LISTINGS, key);
+    return jsonResponse({ ok: true }, request);
   }
 
   return jsonResponse({ error: "Not found" }, request, 404);

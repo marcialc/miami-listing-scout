@@ -4,6 +4,7 @@ import type {
   ListingAnalysis,
   ModuleResult,
   Recommendation,
+  RprData,
   ScoutConfig,
 } from "@miami-listing-scout/shared";
 import { ANALYSIS_MODULES } from "@miami-listing-scout/shared";
@@ -12,7 +13,7 @@ const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
 const BATCH_SIZE = 5;
 
-const SYSTEM_PROMPT = `You are an expert Miami real estate investment analyst. You analyze MLS listings and provide detailed, data-driven assessments across multiple dimensions.
+const SYSTEM_PROMPT = `You are an expert Miami real estate investment analyst. You analyze MLS listings and provide concise, data-driven assessments across multiple dimensions.
 
 You MUST respond with valid JSON matching this exact structure:
 {
@@ -21,7 +22,7 @@ You MUST respond with valid JSON matching this exact structure:
   "moduleResults": {
     "<module_name>": {
       "score": <number 1-10>,
-      "analysis": "<detailed analysis paragraph>",
+      "analysis": "<2-3 concise sentences with specific numbers and facts — no filler, no generic statements>",
       "highlights": ["<key point 1>", "<key point 2>", ...]
     }
   },
@@ -42,11 +43,19 @@ Recommendation guide:
 - watch: Score 5-6, has potential but wait for price drop or more info
 - pass: Score 1-4, too many red flags or poor value
 
-Be specific to Miami market dynamics: flood zones, hurricane insurance, condo special assessments, rental regulations, seasonal market patterns, and neighborhood-level trends.`;
+Be specific to Miami market dynamics: flood zones, hurricane insurance, condo special assessments, rental regulations, seasonal market patterns, and neighborhood-level trends.
+
+When RPR (Realtors Property Resource) data is provided, use it to ground your analysis with real data:
+- Compare list price to the RPR RVM (Realtors Valuation Model) estimate
+- Factor RPR appreciation trends into investment_potential
+- Use RPR school ratings in neighborhood_insights
+- Flag RPR flood zone risk in red_flags
+- Use RPR cap rate and cash flow data in rental_analysis and investment_potential`;
 
 function buildUserPrompt(
   listing: BridgeListing,
   config: ScoutConfig,
+  rprData?: RprData,
 ): string {
   const lines: string[] = [];
 
@@ -61,7 +70,7 @@ function buildUserPrompt(
   for (const mod of config.analysisModules) {
     switch (mod) {
       case "investment_potential":
-        lines.push("- investment_potential: ROI estimate, rental yield, appreciation potential");
+        lines.push("- investment_potential: Give specific numbers — estimated ROI %, cap rate, rental yield, projected appreciation %. Keep it factual, no generic advice.");
         break;
       case "price_vs_comps":
         lines.push("- price_vs_comps: How does the price compare to similar recent sales nearby?");
@@ -88,6 +97,24 @@ function buildUserPrompt(
     }
   }
 
+  if (rprData) {
+    lines.push("\n--- RPR (Realtors Property Resource) Data ---");
+    lines.push("Use the following verified data to ground your analysis:");
+    lines.push("```json");
+    lines.push(JSON.stringify(rprData, null, 2));
+    lines.push("```");
+    lines.push("Key instructions for RPR data:");
+    lines.push("- Compare list price to RVM estimate (priceToValueRatio < 1 = underpriced, > 1 = overpriced)");
+    lines.push("- Factor appreciation rates into investment_potential score");
+    lines.push("- Use school ratings in neighborhood_insights");
+    lines.push("- Flag high-risk flood zones in red_flags");
+    lines.push("- Use RPR cap rate, monthly cash flow, and rent estimate in rental_analysis and investment_potential");
+  }
+
+  if (config.locale === "es") {
+    lines.push("\nIMPORTANT: Write ALL text values (summary, analysis, highlights, customResults) in Spanish. JSON keys must remain in English.");
+  }
+
   lines.push("\nRespond ONLY with the JSON object. No markdown fences, no extra text.");
 
   return lines.join("\n");
@@ -102,8 +129,9 @@ export async function analyzeListing(
   listing: BridgeListing,
   config: ScoutConfig,
   apiKey: string,
+  rprData?: RprData,
 ): Promise<ListingAnalysis> {
-  const userPrompt = buildUserPrompt(listing, config);
+  const userPrompt = buildUserPrompt(listing, config, rprData);
 
   const res = await fetch(ANTHROPIC_API, {
     method: "POST",
@@ -170,6 +198,7 @@ export async function analyzeListings(
   listings: BridgeListing[],
   config: ScoutConfig,
   apiKey: string,
+  rprDataMap?: Map<string, RprData>,
 ): Promise<ListingAnalysis[]> {
   const results: ListingAnalysis[] = [];
 
@@ -181,7 +210,7 @@ export async function analyzeListings(
     console.log(`[analyzer] Processing batch ${batchNum}/${totalBatches} (${batch.length} listings)`);
 
     const settled = await Promise.allSettled(
-      batch.map((listing) => analyzeListing(listing, config, apiKey)),
+      batch.map((listing) => analyzeListing(listing, config, apiKey, rprDataMap?.get(listing.listingId))),
     );
 
     for (let j = 0; j < settled.length; j++) {

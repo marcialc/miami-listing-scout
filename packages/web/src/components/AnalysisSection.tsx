@@ -2,38 +2,13 @@ import { useCallback } from "react";
 import type { AnalysisModule, ScoutConfig } from "@miami-listing-scout/shared";
 import { ANALYSIS_MODULES } from "@miami-listing-scout/shared";
 import { SectionCard } from "./SectionCard";
+import { useI18n } from "../i18n";
+import type { TranslationKey } from "../i18n";
 
 interface Props {
   config: ScoutConfig;
   updateConfig: (fn: (prev: ScoutConfig) => ScoutConfig) => void;
 }
-
-const MODULE_INFO: Record<AnalysisModule, { label: string; description: string }> = {
-  investment_potential: {
-    label: "Investment Potential",
-    description: "ROI estimate, rental yield, appreciation potential",
-  },
-  price_vs_comps: {
-    label: "Price vs Comps",
-    description: "Comparison to similar recent sales nearby",
-  },
-  red_flags: {
-    label: "Red Flags",
-    description: "Structural issues, DOM anomalies, price drops, HOA concerns",
-  },
-  neighborhood_insights: {
-    label: "Neighborhood Insights",
-    description: "Schools, crime, walkability, nearby development",
-  },
-  rental_analysis: {
-    label: "Rental Analysis",
-    description: "Monthly rent estimate, occupancy, STR vs LTR",
-  },
-  flip_potential: {
-    label: "Flip Potential",
-    description: "Rehab cost estimate and after-repair value (ARV)",
-  },
-};
 
 function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -56,6 +31,8 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 }
 
 export function AnalysisSection({ config, updateConfig }: Props) {
+  const { t } = useI18n();
+
   const toggleModule = useCallback(
     (mod: AnalysisModule, enabled: boolean) => {
       updateConfig((prev) => ({
@@ -97,15 +74,14 @@ export function AnalysisSection({ config, updateConfig }: Props) {
 
   return (
     <SectionCard
-      title="AI Analysis"
-      description="Configure what Claude analyzes for each matching listing"
+      title={t("analysis.title")}
+      description={t("analysis.description")}
     >
       <div className="flex flex-col gap-6">
         <div>
-          <h4 className="text-sm font-medium text-stone-700 mb-3">Analysis Modules</h4>
+          <h4 className="text-sm font-medium text-stone-700 mb-3">{t("analysis.modules")}</h4>
           <div className="flex flex-col gap-1">
             {ANALYSIS_MODULES.map((mod) => {
-              const info = MODULE_INFO[mod];
               const enabled = config.analysisModules.includes(mod);
               return (
                 <div
@@ -113,8 +89,8 @@ export function AnalysisSection({ config, updateConfig }: Props) {
                   className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-stone-50 transition-colors"
                 >
                   <div className="pr-4">
-                    <div className="text-sm font-medium text-stone-800">{info.label}</div>
-                    <div className="text-xs text-stone-500 mt-0.5">{info.description}</div>
+                    <div className="text-sm font-medium text-stone-800">{t(`module.${mod}.label` as TranslationKey)}</div>
+                    <div className="text-xs text-stone-500 mt-0.5">{t(`module.${mod}.description` as TranslationKey)}</div>
                   </div>
                   <Toggle enabled={enabled} onChange={(v) => toggleModule(mod, v)} />
                 </div>
@@ -124,9 +100,9 @@ export function AnalysisSection({ config, updateConfig }: Props) {
         </div>
 
         <div className="border-t border-stone-200 pt-5">
-          <h4 className="text-sm font-medium text-stone-700 mb-1">Custom Requirements</h4>
+          <h4 className="text-sm font-medium text-stone-700 mb-1">{t("analysis.customTitle")}</h4>
           <p className="text-xs text-stone-400 mb-3">
-            Add plain-English questions for the AI to answer about each listing
+            {t("analysis.customHelp")}
           </p>
 
           <div className="flex flex-col gap-2">
@@ -136,7 +112,7 @@ export function AnalysisSection({ config, updateConfig }: Props) {
                   type="text"
                   value={req}
                   onChange={(e) => updateRequirement(i, e.target.value)}
-                  placeholder="Is this property good for Airbnb/short-term rental?"
+                  placeholder={t("analysis.customPlaceholder")}
                   className="flex-1 text-sm border border-stone-300 rounded-lg py-2.5 px-3 bg-white text-stone-800 placeholder:text-stone-400 focus:border-accent-500 focus:ring-1 focus:ring-accent-500 outline-none transition-colors"
                 />
                 <button
@@ -161,8 +137,26 @@ export function AnalysisSection({ config, updateConfig }: Props) {
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v8M8 12h8" />
             </svg>
-            Add requirement
+            {t("analysis.addRequirement")}
           </button>
+        </div>
+        {/* RPR Enrichment toggle */}
+        <div className="border-t border-stone-200 pt-5">
+          <div className="flex items-center justify-between py-3 px-3 -mx-3 rounded-lg hover:bg-stone-50 transition-colors">
+            <div className="pr-4">
+              <div className="text-sm font-medium text-stone-800">{t("rpr.title")}</div>
+              <div className="text-xs text-stone-500 mt-0.5">{t("rpr.description")}</div>
+            </div>
+            <Toggle
+              enabled={config.rprEnabled}
+              onChange={(v) => updateConfig((prev) => ({ ...prev, rprEnabled: v }))}
+            />
+          </div>
+          {config.rprEnabled && (
+            <div className="mt-2 mx-0 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+              {t("rpr.requiresNar")}
+            </div>
+          )}
         </div>
       </div>
     </SectionCard>

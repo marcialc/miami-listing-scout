@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { MLS_CITIES } from "@miami-listing-scout/shared";
+import { useI18n } from "../i18n";
 
 interface Props {
   selected: string[];
@@ -7,7 +8,9 @@ interface Props {
   placeholder?: string;
 }
 
-export function CityAutocomplete({ selected, onChange, placeholder = "Search cities..." }: Props) {
+export function CityAutocomplete({ selected, onChange, placeholder }: Props) {
+  const { t } = useI18n();
+  const resolvedPlaceholder = placeholder ?? t("filters.searchCityPlaceholder");
   const [input, setInput] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);
@@ -117,7 +120,7 @@ export function CityAutocomplete({ selected, onChange, placeholder = "Search cit
           }}
           onFocus={() => setShowDropdown(true)}
           onKeyDown={handleKeyDown}
-          placeholder={selected.length === 0 ? placeholder : ""}
+          placeholder={selected.length === 0 ? resolvedPlaceholder : ""}
           className="flex-1 min-w-[120px] text-sm outline-none bg-transparent text-stone-800 placeholder:text-stone-400"
         />
       </div>

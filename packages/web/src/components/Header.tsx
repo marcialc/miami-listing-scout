@@ -1,14 +1,16 @@
 import type { HealthStatus } from "../api";
+import { useI18n, formatDate } from "../i18n";
+import type { Locale, TranslationKey } from "../i18n";
 
 interface HeaderProps {
   health: HealthStatus | null;
   runningTest: boolean;
-  onRunNow: () => void;
+  onRunClick: () => void;
   schedule: { timezone: string; hour: number };
   currentPage: string;
 }
 
-function formatLastRun(iso: string): string {
+function formatLastRun(iso: string, t: (key: TranslationKey, params?: Record<string, string | number>) => string, locale: Locale): string {
   try {
     const d = new Date(iso);
     const now = new Date();
@@ -16,28 +18,30 @@ function formatLastRun(iso: string): string {
     const diffH = Math.floor(diffMs / 3_600_000);
     const diffM = Math.floor(diffMs / 60_000);
 
-    if (diffM < 1) return "Just now";
-    if (diffM < 60) return `${diffM}m ago`;
-    if (diffH < 24) return `${diffH}h ago`;
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    if (diffM < 1) return t("header.justNow");
+    if (diffM < 60) return t("header.minutesAgo", { count: diffM });
+    if (diffH < 24) return t("header.hoursAgo", { count: diffH });
+    return formatDate(d, locale, { month: "short", day: "numeric" });
   } catch {
-    return "Unknown";
+    return t("header.unknown");
   }
 }
 
-function formatNextRun(schedule: { timezone: string; hour: number }): string {
+function formatNextRun(schedule: { timezone: string; hour: number }, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
   const h = schedule.hour;
-  const ampm = h >= 12 ? "PM" : "AM";
+  const ampm = h >= 12 ? t("email.pm") : t("email.am");
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${h12}:00 ${ampm} daily`;
+  return `${h12}:00 ${ampm} ${t("header.daily")}`;
 }
 
-const TABS = [
-  { id: "settings", label: "Settings", hash: "#/" },
-  { id: "reports", label: "Reports", hash: "#/reports" },
+const TABS: { id: string; labelKey: TranslationKey; hash: string }[] = [
+  { id: "settings", labelKey: "tabs.settings", hash: "#/" },
+  { id: "reports", labelKey: "tabs.reports", hash: "#/reports" },
 ];
 
-export function Header({ health, runningTest, onRunNow, schedule, currentPage }: HeaderProps) {
+export function Header({ health, runningTest, onRunClick, schedule, currentPage }: HeaderProps) {
+  const { locale, setLocale, t } = useI18n();
+
   return (
     <header className="bg-white border-b border-stone-200">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -50,30 +54,46 @@ export function Header({ health, runningTest, onRunNow, schedule, currentPage }:
             </svg>
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-stone-900 leading-tight">Listing Scout</h1>
-            <p className="text-xs text-stone-400">Miami Real Estate Intelligence</p>
+            <h1 className="text-lg font-semibold text-stone-900 leading-tight">{t("header.title")}</h1>
+            <p className="text-xs text-stone-400">{t("header.tagline")}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Language toggle */}
+          <div className="flex rounded-md overflow-hidden border border-stone-200 text-xs">
+            <button
+              onClick={() => setLocale("en")}
+              className={`px-2 py-1 cursor-pointer transition-colors ${locale === "en" ? "bg-accent-600 text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
+            >
+              {t("lang.en")}
+            </button>
+            <button
+              onClick={() => setLocale("es")}
+              className={`px-2 py-1 cursor-pointer transition-colors ${locale === "es" ? "bg-accent-600 text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
+            >
+              {t("lang.es")}
+            </button>
+          </div>
+
           <div className="hidden sm:flex flex-col items-end text-xs text-stone-500">
             {health ? (
               <>
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent-500" />
-                  Last run: {formatLastRun(health.lastRun)}
+                  {t("header.lastRun", { time: formatLastRun(health.lastRun, t, locale) })}
                 </span>
-                <span className="text-stone-400">Next: {formatNextRun(schedule)}</span>
+                <span className="text-stone-400">{t("header.next", { time: formatNextRun(schedule, t) })}</span>
               </>
             ) : (
-              <span className="text-stone-400">Worker not connected</span>
+              <span className="text-stone-400">{t("header.workerNotConnected")}</span>
             )}
           </div>
 
           <button
-            onClick={onRunNow}
+            onClick={onRunClick}
             disabled={runningTest}
-            className="px-3.5 py-2 text-sm font-medium rounded-lg bg-accent-600 text-white hover:bg-accent-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            className="px-3.5 py-2 text-sm font-medium rounded-lg bg-accent-600 text-white hover:bg-accent-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
           >
             {runningTest ? (
               <span className="flex items-center gap-2">
@@ -81,10 +101,10 @@ export function Header({ health, runningTest, onRunNow, schedule, currentPage }:
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Running...
+                {t("header.running")}
               </span>
             ) : (
-              "Run Now"
+              t("header.runNow")
             )}
           </button>
         </div>
@@ -103,7 +123,7 @@ export function Header({ health, runningTest, onRunNow, schedule, currentPage }:
                   : "border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300"
               }`}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </a>
           );
         })}

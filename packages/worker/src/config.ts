@@ -101,3 +101,23 @@ export async function getReport(kv: KVNamespace, key: string): Promise<DailyRepo
   if (!raw) return null;
   return JSON.parse(raw) as DailyReport;
 }
+
+export async function deleteReport(configKv: KVNamespace, seenKv: KVNamespace, key: string): Promise<void> {
+  // Load report to get listing IDs before deleting
+  const report = await getReport(configKv, key);
+
+  // Delete the report data + update index
+  await configKv.delete(key);
+  const index = await getReportIndex(configKv);
+  const filtered = index.filter((r) => r.key !== key);
+  await configKv.put(REPORT_INDEX_KEY, JSON.stringify(filtered));
+
+  // Remove seen markers so listings can be re-fetched
+  if (report) {
+    await Promise.all(
+      report.listings.map((l) => seenKv.delete(`seen:${l.listing.listingId}`))
+    );
+  }
+
+  console.log(`[config] Report deleted: ${key} (${report ? report.listings.length : 0} seen markers removed)`);
+}

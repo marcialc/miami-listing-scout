@@ -31,10 +31,13 @@ export interface ListingFilters {
 
 // ── Scout Config ─────────────────────────────────────────────────
 
+export type Locale = "en" | "es";
+
 export interface ScoutConfig {
   id: string;
   email: string;
   name: string;
+  locale: Locale;
   baseFilters: ListingFilters;
   analysisModules: AnalysisModule[];
   customRequirements: string[];
@@ -44,6 +47,7 @@ export interface ScoutConfig {
     frequency: ScanFrequency;
   };
   maxListingsPerReport: number;
+  rprEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,6 +127,59 @@ export interface ListingAnalysis {
   analyzedAt: string;
 }
 
+// ── RPR Data ────────────────────────────────────────────────────
+
+export interface RprValuation {
+  estimatedValue: number;
+  valuationDate: string;
+  confidenceScore: number;       // 0-100
+  priceToValueRatio: number;     // listPrice / estimatedValue
+}
+
+export interface RprNeighborhood {
+  appreciationRate1Yr: number;
+  appreciationRate5Yr: number;
+  medianHomeValue: number;
+  medianHouseholdIncome: number;
+}
+
+export interface RprSchool {
+  name: string;
+  type: "elementary" | "middle" | "high";
+  rating: number;                // 1-10
+  distanceMiles: number;
+}
+
+export interface RprFloodZone {
+  zone: string;                  // e.g. "AE", "X"
+  isHighRisk: boolean;
+  description: string;
+}
+
+export interface RprTaxHistory {
+  year: number;
+  assessedValue: number;
+  taxAmount: number;
+}
+
+export interface RprInvestmentMetrics {
+  estimatedCapRate: number;
+  estimatedMonthlyCashFlow: number;
+  estimatedMonthlyRent: number;
+  grossRentMultiplier: number;
+}
+
+export interface RprData {
+  listingId: string;
+  valuation: RprValuation;
+  neighborhood: RprNeighborhood;
+  schools: RprSchool[];
+  floodZone: RprFloodZone;
+  taxHistory: RprTaxHistory[];
+  investmentMetrics: RprInvestmentMetrics;
+  fetchedAt: string;
+}
+
 // ── Daily Report ─────────────────────────────────────────────────
 
 export interface DailyReport {
@@ -134,6 +191,7 @@ export interface DailyReport {
   listings: Array<{
     listing: BridgeListing;
     analysis: ListingAnalysis;
+    rprData?: RprData;
   }>;
   generatedAt: string;
 }
@@ -270,6 +328,7 @@ export const MLS_CITIES: readonly string[] = [
 // ── Default Config ───────────────────────────────────────────────
 
 export const DEFAULT_CONFIG: Omit<ScoutConfig, "id" | "email" | "name" | "createdAt" | "updatedAt"> = {
+  locale: "en",
   baseFilters: {
     cities: [
       "Miami",
@@ -293,4 +352,5 @@ export const DEFAULT_CONFIG: Omit<ScoutConfig, "id" | "email" | "name" | "create
     frequency: "daily",
   },
   maxListingsPerReport: 25,
+  rprEnabled: false,
 };
