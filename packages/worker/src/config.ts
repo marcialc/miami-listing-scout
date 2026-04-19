@@ -18,13 +18,17 @@ export async function getConfig(kv: KVNamespace): Promise<ScoutConfig> {
     return {
       id: "default",
       email: "",
+      emailFrom: "",
       name: "",
       ...DEFAULT_CONFIG,
       createdAt: now,
       updatedAt: now,
     };
   }
-  return JSON.parse(raw) as ScoutConfig;
+  const parsed = JSON.parse(raw) as ScoutConfig;
+  // Backfill emailFrom for configs saved before the field existed
+  if (parsed.emailFrom === undefined) parsed.emailFrom = "";
+  return parsed;
 }
 
 export async function saveConfig(kv: KVNamespace, config: ScoutConfig): Promise<void> {

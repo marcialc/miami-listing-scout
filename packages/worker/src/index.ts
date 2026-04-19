@@ -14,7 +14,6 @@ export interface Env {
   ANTHROPIC_API_KEY: string;
   RESEND_API_KEY: string;
   CONFIG_API_KEY: string;
-  EMAIL_FROM: string;
   MOCK_MODE: string;
   RPR_API_TOKEN?: string;
 }
@@ -31,12 +30,15 @@ async function runPipeline(env: Env, preloadedConfig?: ScoutConfig, dateOverride
   const isHistorical = !!dateOverride;
   console.log(`[pipeline] Starting ${isHistorical ? "historical" : "daily"} listing scan${mock ? " (MOCK MODE)" : ""}${isHistorical ? ` (${dateOverride.since} to ${dateOverride.until})` : ""}`);
 
-  console.log("env.EMAIL_FROM: ",env.EMAIL_FROM)
   // 1. Load config (use preloaded if available to avoid redundant KV read)
   const config = preloadedConfig ?? await getConfig(env.SCOUT_CONFIG);
   if (!config.email) {
     console.log("[pipeline] No email configured — skipping run");
     return "Skipped: no email configured";
+  }
+  if (!config.emailFrom) {
+    console.log("[pipeline] No sender (emailFrom) configured — skipping run");
+    return "Skipped: no sender (emailFrom) configured";
   }
 
   // 2. Get last run timestamp (use dateOverride if provided)
@@ -117,7 +119,7 @@ async function runPipeline(env: Env, preloadedConfig?: ScoutConfig, dateOverride
   const html = renderEmail(report, config);
 
   try {
-    await sendReport(report, html, config, env.RESEND_API_KEY, env.EMAIL_FROM);
+    await sendReport(report, html, config, env.RESEND_API_KEY, config.emailFrom);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[pipeline] Failed to send report email: ${msg}`);
@@ -199,8 +201,8 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   if (path === "/api/config" && request.method === "PUT") {
     try {
       const body = await request.json() as ScoutConfig;
-      if (!body.id || !body.email) {
-        return jsonResponse({ error: "Missing required fields: id, email" }, request, 400);
+      if (!body.id || !body.email || !body.emailFrom) {
+        return jsonResponse({ error: "Missing required fields: id, email, emailFrom" }, request, 400);
       }
       await saveConfig(env.SCOUT_CONFIG, body);
       return jsonResponse({ ok: true }, request);

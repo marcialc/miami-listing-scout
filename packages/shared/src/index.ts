@@ -36,6 +36,7 @@ export type Locale = "en" | "es";
 export interface ScoutConfig {
   id: string;
   email: string;
+  emailFrom: string;
   name: string;
   locale: Locale;
   baseFilters: ListingFilters;
@@ -327,7 +328,7 @@ export const MLS_CITIES: readonly string[] = [
 
 // ── Default Config ───────────────────────────────────────────────
 
-export const DEFAULT_CONFIG: Omit<ScoutConfig, "id" | "email" | "name" | "createdAt" | "updatedAt"> = {
+export const DEFAULT_CONFIG: Omit<ScoutConfig, "id" | "email" | "emailFrom" | "name" | "createdAt" | "updatedAt"> = {
   locale: "en",
   baseFilters: {
     cities: [

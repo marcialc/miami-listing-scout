@@ -16,6 +16,7 @@ function fallbackConfig(): ScoutConfig {
   return {
     id: "default",
     email: "",
+    emailFrom: "",
     name: "",
     ...DEFAULT_CONFIG,
     createdAt: now,

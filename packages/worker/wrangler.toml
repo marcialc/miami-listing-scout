@@ -8,14 +8,15 @@ crons = ["0 */12 * * *"]  # Every 12h (00:00 and 12:00 UTC) — handler skips ba
 [[kv_namespaces]]
 binding = "SCOUT_CONFIG"
 id = "265b26f823ff409880db18ce68062b67"
+preview_id = "bef3fa3569114488a5fa4fb5e9e4d759"
 
 [[kv_namespaces]]
 binding = "SEEN_LISTINGS"
 id = "def844544b384b9fa489ecfcd42e4cdf"
+preview_id = "7040cce626ad4c25a5c84f5cc583a143"
 
 [vars]
-EMAIL_FROM = "scout@yourdomain.com"
-MOCK_MODE = "true"
+MOCK_MODE = "false"
 
 # Set these via `wrangler secret put` for production
 # or in .dev.vars for local development:

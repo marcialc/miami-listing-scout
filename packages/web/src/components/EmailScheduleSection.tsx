@@ -75,6 +75,18 @@ export function EmailScheduleSection({ config, updateConfig }: Props) {
           <p className="mt-1 text-xs text-stone-400">{t("email.addressHelp")}</p>
         </div>
 
+        <div>
+          <label className="block text-sm font-medium text-stone-700 mb-1.5">{t("email.fromAddress")}</label>
+          <input
+            type="email"
+            value={config.emailFrom}
+            onChange={(e) => updateConfig((prev) => ({ ...prev, emailFrom: e.target.value }))}
+            placeholder={t("email.fromAddressPlaceholder")}
+            className="w-full text-sm border border-stone-300 rounded-lg py-2.5 px-3 bg-white text-stone-800 placeholder:text-stone-400 focus:border-accent-500 focus:ring-1 focus:ring-accent-500 outline-none transition-colors"
+          />
+          <p className="mt-1 text-xs text-stone-400">{t("email.fromAddressHelp")}</p>
+        </div>
+
         <div className="grid grid-cols-2 gap-5">
           <div>
             <label className="block text-sm font-medium text-stone-700 mb-1.5">{t("email.frequency")}</label>

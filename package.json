@@ -6,6 +6,7 @@
     "dev": "turbo run dev --parallel",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
+    "predeploy:worker": "./scripts/check-secrets.sh",
     "deploy:worker": "pnpm --filter @miami-listing-scout/worker exec wrangler deploy",
     "deploy:web": "pnpm --filter @miami-listing-scout/web exec wrangler pages deploy dist --project-name=miami-listing-scout"
   },
