@@ -18,6 +18,21 @@ preview_id = "7040cce626ad4c25a5c84f5cc583a143"
 [vars]
 MOCK_MODE = "false"
 
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
 # Set these via `wrangler secret put` for production
 # or in .dev.vars for local development:
 # BRIDGE_API_TOKEN=
