@@ -19,7 +19,7 @@ preview_id = "7040cce626ad4c25a5c84f5cc583a143"
 MOCK_MODE = "false"
 
 [observability]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 
 [observability.logs]
